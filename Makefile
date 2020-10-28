@@ -6,6 +6,7 @@ VPATH = src/
 SRC = \
     src/ast/ast.c \
     src/eval/eval.c \
+    src/parse/climbing_parse.c \
     src/parse/recursive_parse.c \
 
 BIN = evalexpr
