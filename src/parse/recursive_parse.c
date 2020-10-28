@@ -26,21 +26,21 @@ static void skip_whitespace(const char **input)
 }
 
 /*
-** Simple recursive descent using the following grammar, using E as start:
-**
-**      E : T [ ('+'|'-') T ]*
-**      T : F [ ('*'|'/') F ]*
-**      F : [ ('-'|'+') ]* P
-**      P : G [ ('^') F ]*
-**      G : '(' E ')' | CONSTANT [ '!' ]
-**
-** Whitespace is ignored in the input string, only serving to delimit numbers.
-**
-** The input shall consist of a single expression, having a trailing
-** expression in the input results in an error.
-**/
+ * Simple recursive descent using the following grammar, using E as start:
+ *
+ *      E : T [ ('+'|'-') T ]*
+ *      T : F [ ('*'|'/') F ]*
+ *      F : [ ('-'|'+') ]* P
+ *      P : G [ ('^') F ]*
+ *      G : '(' E ')' | CONSTANT [ '!' ]
+ *
+ * Whitespace is ignored in the input string, only serving to delimit numbers.
+ *
+ * The input shall consist of a single expression, having a trailing
+ * expression in the input results in an error.
+ */
 
-struct ast_node *parse_string(const char *input)
+struct ast_node *recursive_parse(const char *input)
 {
     if (input == NULL)
         return NULL;

@@ -6,7 +6,7 @@ VPATH = src/
 SRC = \
     src/ast/ast.c \
     src/eval/eval.c \
-    src/parse/parse.c \
+    src/parse/recursive_parse.c \
 
 BIN = evalexpr
 OBJ = $(SRC:.c=.o)

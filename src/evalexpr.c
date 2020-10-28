@@ -13,7 +13,7 @@ int main(void)
 
     while ((getline(&line, &size, stdin)) > 0)
     {
-        struct ast_node *ast = parse_string(line);
+        struct ast_node *ast = recursive_parse(line);
 
         if (ast == NULL)
         {

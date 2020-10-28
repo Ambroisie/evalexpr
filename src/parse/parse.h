@@ -3,6 +3,6 @@
 
 #include "ast/ast.h"
 
-struct ast_node *parse_string(const char *input);
+struct ast_node *recursive_parse(const char *input);
 
 #endif /* !PARSE_H */
