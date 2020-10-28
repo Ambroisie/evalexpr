@@ -1,7 +1,8 @@
 CC = gcc
-CPPFLAGS = -Isrc/ -D_POSIX_C_SOURCE=200809L
+CPPFLAGS = -Isrc/ -D_POSIX_C_SOURCE=200809L -D_USE_CLIMBING=$(USE_CLIMBING)
 CFLAGS = -Wall -Wextra -pedantic -Werror -std=c99
 VPATH = src/
+USE_CLIMBING = 1
 
 SRC = \
     src/ast/ast.c \

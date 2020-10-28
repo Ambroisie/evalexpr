@@ -5,6 +5,10 @@
 #include "eval/eval.h"
 #include "parse/parse.h"
 
+#ifndef _USE_CLIMBING
+# define _USE_CLIMBING 0
+#endif
+
 int main(void)
 {
     char *line = NULL;
@@ -13,7 +17,11 @@ int main(void)
 
     while ((getline(&line, &size, stdin)) > 0)
     {
+#if _USE_CLIMBING
+        struct ast_node *ast = climbing_parse(line);
+#else
         struct ast_node *ast = recursive_parse(line);
+#endif
 
         if (ast == NULL)
         {
