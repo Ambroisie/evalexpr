@@ -64,12 +64,28 @@ static bool is_binop(char c)
     return false;
 }
 
-static bool prec_between(const char **input, int min, int max)
+static bool is_prefix(char c)
 {
-    skip_whitespace(input);
-
     for (size_t i = 0; i < ARR_SIZE(ops); ++i)
-        if (*input[0] == ops[i].op[0])
+        if (ops[i].fix == OP_PREFIX && c == ops[i].op[0])
+            return true;
+
+    return false;
+}
+
+static bool is_postfix(char c)
+{
+    for (size_t i = 0; i < ARR_SIZE(ops); ++i)
+        if (ops[i].fix == OP_POSTFIX && c == ops[i].op[0])
+            return true;
+
+    return false;
+}
+
+static bool prec_between(char c, int min, int max)
+{
+    for (size_t i = 0; i < ARR_SIZE(ops); ++i)
+        if (c == ops[i].op[0] && ops[i].fix != OP_PREFIX)
             return min <= ops[i].prio && ops[i].prio <= max;
 
     return false;
@@ -136,7 +152,9 @@ static struct ast_node *climbing_parse_internal(const char **input, int prec)
     struct ast_node *ast = parse_operand(input);
 
     int r = INT_MAX;
-    while (/* infix_or_postfix(input) && */ prec_between(input, prec, r) && ast)
+    while ((skip_whitespace(input), true) && // We need to skip the whitespace
+            (is_binop(*input[0]) || is_postfix(*input[0]))
+            && prec_between(*input[0], prec, r) && ast)
     {
         const char c = *input[0];
         eat_char(input);
@@ -190,7 +208,7 @@ static struct ast_node *parse_operand(const char **input)
     struct ast_node *ast = NULL;
 
     int val = 0;
-    if (*input[0] == '+' || *input[0] == '-')
+    if (is_prefix(*input[0]))
     {
         enum unop_kind op = char_to_unop(*input[0]);
         // Remove the parenthesis
