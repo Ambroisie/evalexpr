@@ -91,6 +91,8 @@ static bool prec_between(char c, int min, int max)
     return false;
 }
 
+// This function happen to work the way the code is setup, because of operator
+// ordering
 static int right_prec(char c)
 {
     for (size_t i = 0; i < ARR_SIZE(ops); ++i)
@@ -104,6 +106,8 @@ static int right_prec(char c)
     return INT_MIN;
 }
 
+// This function happen to work the way the code is setup, because of operator
+// ordering
 static int next_prec(char c)
 {
     for (size_t i = 0; i < ARR_SIZE(ops); ++i)
@@ -202,6 +206,19 @@ static bool my_atoi(const char **input, int *val)
     return true;
 }
 
+static int next_prec_prefix(int op)
+{
+    for (size_t i = 0; i < ARR_SIZE(ops); ++i)
+        if (ops[i].fix == OP_PREFIX && op == ops[i].kind)
+        {
+            if (ops[i].assoc != ASSOC_LEFT)
+                return ops[i].prio - 1;
+            return ops[i].prio;
+        }
+
+    return INT_MIN;
+}
+
 static struct ast_node *parse_operand(const char **input)
 {
     skip_whitespace(input); // Whitespace is not significant
@@ -214,7 +231,7 @@ static struct ast_node *parse_operand(const char **input)
         // Remove the parenthesis
         eat_char(input);
 
-        ast = climbing_parse_internal(input, 2); // FIXME: should be from table
+        ast = climbing_parse_internal(input, next_prec_prefix(op));
 
         if (!ast)
             return NULL;
