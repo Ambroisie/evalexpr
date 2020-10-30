@@ -17,9 +17,12 @@ static const struct {
     const enum { ASSOC_LEFT, ASSOC_RIGHT, ASSOC_NONE } assoc;
     const enum { OP_INFIX, OP_PREFIX, OP_POSTFIX } fix;
 } ops[] = {
-# define BINOP(Op, Kind, Prio, Assoc, Fix) { #Op, Kind, Prio, Assoc, Fix },
-# define PREOP(Op, Kind, Prio, Assoc, Fix) { #Op, Kind, Prio, Assoc, Fix },
-# define POSTOP(Op, Kind, Prio, Assoc, Fix) { #Op, Kind, Prio, Assoc, Fix },
+# define BINOP(Op, Kind, Prio, Assoc, Fix) \
+    [Kind] = { #Op, Kind, Prio, Assoc, Fix },
+# define PREOP(Op, Kind, Prio, Assoc, Fix) \
+    [Kind] = { #Op, Kind, Prio, Assoc, Fix },
+# define POSTOP(Op, Kind, Prio, Assoc, Fix) \
+    [Kind] = { #Op, Kind, Prio, Assoc, Fix },
 #include "operators.inc"
 };
 
