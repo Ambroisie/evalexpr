@@ -46,11 +46,19 @@ static enum op_kind char_to_binop(char c)
     UNREACHABLE();
 }
 
-// Only works because no overlap between prefix and postfix operators
-static enum op_kind char_to_unop(char c)
+static enum op_kind char_to_prefix(char c)
 {
     for (size_t i = 0; i < ARR_SIZE(ops); ++i)
-        if (ops[i].fix != OP_INFIX && c == ops[i].op[0])
+        if (ops[i].fix == OP_PREFIX && c == ops[i].op[0])
+            return ops[i].kind;
+
+    UNREACHABLE();
+}
+
+static enum op_kind char_to_postfix(char c)
+{
+    for (size_t i = 0; i < ARR_SIZE(ops); ++i)
+        if (ops[i].fix == OP_POSTFIX && c == ops[i].op[0])
             return ops[i].kind;
 
     UNREACHABLE();
@@ -159,7 +167,7 @@ static bool update_op(enum op_kind *op, const char **input)
     }
     if (is_postfix(c))
     {
-        *op = char_to_unop(c);
+        *op = char_to_postfix(c);
         return true;
     }
 
@@ -231,8 +239,8 @@ static struct ast_node *parse_operand(const char **input)
     int val = 0;
     if (is_prefix(*input[0]))
     {
-        enum op_kind op = char_to_unop(*input[0]);
-        // Remove the parenthesis
+        enum op_kind op = char_to_prefix(*input[0]);
+        // Remove the operator
         eat_char(input);
 
         ast = climbing_parse_internal(input, next_prec(op));
