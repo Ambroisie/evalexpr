@@ -37,7 +37,7 @@ static void skip_whitespace(const char **input)
         eat_char(input);
 }
 
-static enum binop_kind char_to_binop(char c)
+static enum op_kind char_to_binop(char c)
 {
     for (size_t i = 0; i < ARR_SIZE(ops); ++i)
         if (ops[i].fix == OP_INFIX && c == ops[i].op[0])
@@ -46,7 +46,7 @@ static enum binop_kind char_to_binop(char c)
     UNREACHABLE();
 }
 
-static enum unop_kind char_to_unop(char c)
+static enum op_kind char_to_unop(char c)
 {
     for (size_t i = 0; i < ARR_SIZE(ops); ++i)
         if (ops[i].fix != OP_INFIX && c == ops[i].op[0])
@@ -164,7 +164,7 @@ static struct ast_node *climbing_parse_internal(const char **input, int prec)
         eat_char(input);
         if (is_binop(c))
         {
-            enum binop_kind op = char_to_binop(c);
+            enum op_kind op = char_to_binop(c);
             struct ast_node *rhs = climbing_parse_internal(input, right_prec(c));
             if (!rhs)
             {
@@ -227,7 +227,7 @@ static struct ast_node *parse_operand(const char **input)
     int val = 0;
     if (is_prefix(*input[0]))
     {
-        enum unop_kind op = char_to_unop(*input[0]);
+        enum op_kind op = char_to_unop(*input[0]);
         // Remove the parenthesis
         eat_char(input);
 

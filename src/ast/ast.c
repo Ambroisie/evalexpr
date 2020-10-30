@@ -15,8 +15,12 @@ struct ast_node *make_num(int val)
     return ret;
 }
 
-struct ast_node *make_unop(enum unop_kind op, struct ast_node *tree)
+struct ast_node *make_unop(enum op_kind op, struct ast_node *tree)
 {
+    // Defensive programming
+    if (op >= BINOP_PLUS)
+        return NULL;
+
     struct ast_node *ret = malloc(sizeof(*ret));
 
     if (ret == NULL)
@@ -29,9 +33,13 @@ struct ast_node *make_unop(enum unop_kind op, struct ast_node *tree)
     return ret;
 }
 
-struct ast_node *make_binop(enum binop_kind op, struct ast_node *lhs,
+struct ast_node *make_binop(enum op_kind op, struct ast_node *lhs,
                             struct ast_node *rhs)
 {
+    // Defensive programming
+    if (op < BINOP_PLUS)
+        return NULL;
+
     struct ast_node *ret = malloc(sizeof(*ret));
 
     if (ret == NULL)

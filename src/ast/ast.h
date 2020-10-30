@@ -4,15 +4,14 @@
 // Forward declaration
 struct ast_node;
 
-enum unop_kind
+enum op_kind
 {
+    // Prefix operators
     UNOP_IDENTITY,
     UNOP_NEGATE,
+    // Postfix operators
     UNOP_FACT,
-};
-
-enum binop_kind
-{
+    // Infix operators
     BINOP_PLUS,
     BINOP_MINUS,
     BINOP_TIMES,
@@ -22,13 +21,13 @@ enum binop_kind
 
 struct unop_node
 {
-    enum unop_kind op;
+    enum op_kind op;
     struct ast_node *tree;
 };
 
 struct binop_node
 {
-    enum binop_kind op;
+    enum op_kind op;
     struct ast_node *lhs;
     struct ast_node *rhs;
 };
@@ -51,9 +50,9 @@ struct ast_node
 
 struct ast_node *make_num(int val);
 
-struct ast_node *make_unop(enum unop_kind op, struct ast_node *tree);
+struct ast_node *make_unop(enum op_kind op, struct ast_node *tree);
 
-struct ast_node *make_binop(enum binop_kind op, struct ast_node *lhs,
+struct ast_node *make_binop(enum op_kind op, struct ast_node *lhs,
                             struct ast_node *rhs);
 
 void destroy_ast(struct ast_node *ast);

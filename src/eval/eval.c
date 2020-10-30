@@ -30,8 +30,9 @@ static int eval_unop(const struct unop_node *un_op)
         return -eval_ast(un_op->tree);
     case UNOP_FACT:
         return my_fact(eval_ast(un_op->tree));
+    default:
+        UNREACHABLE();
     }
-    UNREACHABLE();
 }
 
 static int eval_binop(const struct binop_node *bin_op)
@@ -49,9 +50,10 @@ static int eval_binop(const struct binop_node *bin_op)
         return EVAL_OP(/, bin_op);
     case BINOP_POW:
         return my_pow(eval_ast(bin_op->lhs), eval_ast(bin_op->rhs));
+    default:
+        UNREACHABLE();
     }
 #undef EVAL_OP
-    UNREACHABLE();
 }
 
 int eval_ast(const struct ast_node *ast)

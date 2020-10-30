@@ -61,7 +61,7 @@ struct ast_node *recursive_parse(const char *input)
     return ast;
 }
 
-static enum binop_kind char_to_binop(char c)
+static enum op_kind char_to_binop(char c)
 {
     switch (c)
     {
@@ -94,7 +94,7 @@ static struct ast_node *parse_expression(const char **input)
 
         if (*input[0] == '+' || *input[0] == '-')
         {
-            const enum binop_kind op = char_to_binop(*input[0]);
+            const enum op_kind op = char_to_binop(*input[0]);
 
             eat_char(input);
 
@@ -130,7 +130,7 @@ static struct ast_node *parse_term(const char **input)
 
         if (*input[0] == '*' || *input[0] == '/')
         {
-            const enum binop_kind op = char_to_binop(*input[0]);
+            const enum op_kind op = char_to_binop(*input[0]);
 
             eat_char(input);
 
@@ -151,7 +151,7 @@ static struct ast_node *parse_term(const char **input)
     return lhs;
 }
 
-static enum unop_kind char_to_unop(char c)
+static enum op_kind char_to_unop(char c)
 {
     switch (c)
     {
@@ -170,7 +170,7 @@ static struct ast_node *parse_factor(const char **input)
     skip_whitespace(input); // Whitespace is not significant
     while (*input[0] == '+' || *input[0] == '-')
     {
-        const enum unop_kind op = char_to_unop(*input[0]);
+        const enum op_kind op = char_to_unop(*input[0]);
 
         eat_char(input);
 
@@ -197,7 +197,7 @@ static struct ast_node *parse_power(const char **input)
 
     if (*input[0] == '^')
     {
-        const enum binop_kind op = char_to_binop(*input[0]);
+        const enum op_kind op = char_to_binop(*input[0]);
 
         eat_char(input);
 
