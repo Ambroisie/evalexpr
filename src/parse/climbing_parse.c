@@ -10,6 +10,19 @@
 #define UNREACHABLE() __builtin_unreachable()
 #define ARR_SIZE(Arr) (sizeof(Arr) / sizeof(*Arr))
 
+static const struct {
+    const char *op;
+    const int kind; // Because we store different kinds of enum...
+    const int prio;
+    const enum { ASSOC_LEFT, ASSOC_RIGHT, ASSOC_NONE } assoc;
+    const enum { OP_INFIX, OP_PREFIX, OP_POSTFIX } fix;
+} ops[] = {
+# define BINOP(Op, Kind, Prio, Assoc, Fix) { #Op, Kind, Prio, Assoc, Fix },
+# define PREOP(Op, Kind, Prio, Assoc, Fix) { #Op, Kind, Prio, Assoc, Fix },
+# define POSTOP(Op, Kind, Prio, Assoc, Fix) { #Op, Kind, Prio, Assoc, Fix },
+#include "operators.inc"
+};
+
 static struct ast_node *climbing_parse_internal(const char **input, int prec);
 static struct ast_node *parse_operand(const char **input);
 
@@ -26,13 +39,8 @@ static void skip_whitespace(const char **input)
 
 static enum binop_kind char_to_binop(char c)
 {
-    static const struct { const char *op; const enum binop_kind kind; } ops[] = {
-#define BINOP(Op, Kind, _, __, ___) { #Op, Kind },
-#include "operators.inc"
-    };
-
     for (size_t i = 0; i < ARR_SIZE(ops); ++i)
-        if (c == ops[i].op[0])
+        if (ops[i].fix == OP_INFIX && c == ops[i].op[0])
             return ops[i].kind;
 
     UNREACHABLE();
@@ -40,14 +48,8 @@ static enum binop_kind char_to_binop(char c)
 
 static enum unop_kind char_to_unop(char c)
 {
-    static const struct { const char *op; const enum unop_kind kind; } ops[] = {
-#define PREOP(Op, Kind, _, __, ___) { #Op, Kind },
-#define POSTOP(Op, Kind, _, __, ___) { #Op, Kind },
-#include "operators.inc"
-    };
-
     for (size_t i = 0; i < ARR_SIZE(ops); ++i)
-        if (c == ops[i].op[0])
+        if (ops[i].fix != OP_INFIX && c == ops[i].op[0])
             return ops[i].kind;
 
     UNREACHABLE();
@@ -55,12 +57,8 @@ static enum unop_kind char_to_unop(char c)
 
 static bool is_binop(char c)
 {
-    static const char *ops[] = {
-#define BINOP(Op, _, __, ___, ____) #Op,
-#include "operators.inc"
-    };
     for (size_t i = 0; i < ARR_SIZE(ops); ++i)
-        if (c == ops[i][0])
+        if (ops[i].fix == OP_INFIX && c == ops[i].op[0])
             return true;
 
     return false;
@@ -68,13 +66,6 @@ static bool is_binop(char c)
 
 static bool prec_between(const char **input, int min, int max)
 {
-    static const struct { const char *op; const int prio; } ops[] = {
-#define BINOP(Op, _, Priority, __, ___) { #Op, Priority },
-#define PREOP(Op, _, Priority, __, ___) { #Op, Priority },
-#define POSTOP(Op, _, Priority, __, ___) { #Op, Priority },
-#include "operators.inc"
-    };
-
     skip_whitespace(input);
 
     for (size_t i = 0; i < ARR_SIZE(ops); ++i)
@@ -83,17 +74,6 @@ static bool prec_between(const char **input, int min, int max)
 
     return false;
 }
-
-static const struct {
-    const char *op;
-    const int kind; // Because we store different kinds of enum...
-    const int prio;
-    const enum { ASSOC_LEFT, ASSOC_RIGHT, ASSOC_NONE } assoc;
-    const enum { OP_INFIX, OP_PREFIX, OP_POSTFIX } fix;
-} ops[] = {
-# define BINOP(Op, Kind, Prio, Assoc, Fix) { #Op, Kind, Prio, Assoc, Fix },
-#include "operators.inc"
-};
 
 static int right_prec(char c)
 {
