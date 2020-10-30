@@ -12,7 +12,7 @@
 
 static const struct {
     const char *op;
-    const int kind; // Because we store different kinds of enum...
+    const enum op_kind kind;
     const int prio;
     const enum { ASSOC_LEFT, ASSOC_RIGHT, ASSOC_NONE } assoc;
     const enum { OP_INFIX, OP_PREFIX, OP_POSTFIX } fix;
@@ -46,6 +46,7 @@ static enum op_kind char_to_binop(char c)
     UNREACHABLE();
 }
 
+// Only works because no overlap between prefix and postfix operators
 static enum op_kind char_to_unop(char c)
 {
     for (size_t i = 0; i < ARR_SIZE(ops); ++i)
@@ -82,21 +83,19 @@ static bool is_postfix(char c)
     return false;
 }
 
-static bool prec_between(char c, int min, int max)
+static bool prec_between(enum op_kind op, int min, int max)
 {
     for (size_t i = 0; i < ARR_SIZE(ops); ++i)
-        if (c == ops[i].op[0] && ops[i].fix != OP_PREFIX)
+        if (op == ops[i].kind)
             return min <= ops[i].prio && ops[i].prio <= max;
 
     return false;
 }
 
-// This function happen to work the way the code is setup, because of operator
-// ordering
-static int right_prec(char c)
+static int right_prec(enum op_kind op)
 {
     for (size_t i = 0; i < ARR_SIZE(ops); ++i)
-        if (c == ops[i].op[0])
+        if (op == ops[i].kind)
         {
             if (ops[i].assoc == ASSOC_RIGHT)
                 return ops[i].prio;
@@ -106,12 +105,10 @@ static int right_prec(char c)
     return INT_MIN;
 }
 
-// This function happen to work the way the code is setup, because of operator
-// ordering
-static int next_prec(char c)
+static int next_prec(enum op_kind op)
 {
     for (size_t i = 0; i < ARR_SIZE(ops); ++i)
-        if (c == ops[i].op[0])
+        if (op == ops[i].kind)
         {
             if (ops[i].assoc != ASSOC_LEFT)
                 return ops[i].prio - 1;
@@ -150,22 +147,42 @@ struct ast_node *climbing_parse(const char *input)
     return ast;
 }
 
+static bool update_op(enum op_kind *op, const char **input)
+{
+    skip_whitespace(input);
+
+    char c = *input[0];
+    if (is_binop(c))
+    {
+        *op = char_to_binop(c);
+        return true;
+    }
+    if (is_postfix(c))
+    {
+        *op = char_to_unop(c);
+        return true;
+    }
+
+    return false;
+}
+
 static struct ast_node *climbing_parse_internal(const char **input, int prec)
 {
     prec = prec;
     struct ast_node *ast = parse_operand(input);
 
     int r = INT_MAX;
-    while ((skip_whitespace(input), true) && // We need to skip the whitespace
-            (is_binop(*input[0]) || is_postfix(*input[0]))
-            && prec_between(*input[0], prec, r) && ast)
+    enum op_kind op; // Used in the next loop
+    while (update_op(&op, input) // Initialise the operator
+            && prec_between(op, prec, r) // Use newly initialized operator
+            && ast)
     {
         const char c = *input[0];
         eat_char(input);
         if (is_binop(c))
         {
-            enum op_kind op = char_to_binop(c);
-            struct ast_node *rhs = climbing_parse_internal(input, right_prec(c));
+            struct ast_node *rhs =
+                climbing_parse_internal(input, right_prec(op));
             if (!rhs)
             {
                 destroy_ast(ast);
@@ -179,12 +196,12 @@ static struct ast_node *climbing_parse_internal(const char **input, int prec)
         }
         else
         {
-            struct ast_node *tree = make_unop(char_to_unop(c), ast);
+            struct ast_node *tree = make_unop(op, ast);
             if (!tree)
                 destroy_ast(ast); // Error case
             ast = tree;
         }
-        r = next_prec(c);
+        r = next_prec(op);
     }
 
     return ast;
@@ -206,19 +223,6 @@ static bool my_atoi(const char **input, int *val)
     return true;
 }
 
-static int next_prec_prefix(int op)
-{
-    for (size_t i = 0; i < ARR_SIZE(ops); ++i)
-        if (ops[i].fix == OP_PREFIX && op == ops[i].kind)
-        {
-            if (ops[i].assoc != ASSOC_LEFT)
-                return ops[i].prio - 1;
-            return ops[i].prio;
-        }
-
-    return INT_MIN;
-}
-
 static struct ast_node *parse_operand(const char **input)
 {
     skip_whitespace(input); // Whitespace is not significant
@@ -231,7 +235,7 @@ static struct ast_node *parse_operand(const char **input)
         // Remove the parenthesis
         eat_char(input);
 
-        ast = climbing_parse_internal(input, next_prec_prefix(op));
+        ast = climbing_parse_internal(input, next_prec(op));
 
         if (!ast)
             return NULL;
