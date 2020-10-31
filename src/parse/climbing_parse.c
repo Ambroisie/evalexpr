@@ -4,21 +4,25 @@
 #include <limits.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <string.h>
 
 #include "ast/ast.h"
 
 #define UNREACHABLE() __builtin_unreachable()
 #define ARR_SIZE(Arr) (sizeof(Arr) / sizeof(*Arr))
+#define OP_STRING(...) (const char[]){__VA_ARGS__}
+#define OP_SIZE(...) (sizeof(OP_STRING(__VA_ARGS__)) - 1)
 
 static const struct {
     const char *op;
+    const size_t op_len;
     const enum op_kind kind;
     const int prio;
     const enum { ASSOC_LEFT, ASSOC_RIGHT, ASSOC_NONE } assoc;
     const enum { OP_INFIX, OP_PREFIX, OP_POSTFIX } fix;
 } ops[] = {
 # define OP(Kind, Prio, Assoc, Fix, /* Operator string */ ...) \
-    [Kind] = { (const char[]){__VA_ARGS__}, Kind, Prio, Assoc, Fix, },
+    { OP_STRING(__VA_ARGS__), OP_SIZE(__VA_ARGS__), Kind, Prio, Assoc, Fix, },
 #include "operators.inc"
 };
 
@@ -45,13 +49,26 @@ static enum op_kind char_to_binop(char c)
     UNREACHABLE();
 }
 
-static enum op_kind char_to_prefix(char c)
+static size_t parse_prefix(enum op_kind *op, const char **input)
 {
-    for (size_t i = 0; i < ARR_SIZE(ops); ++i)
-        if (ops[i].fix == OP_PREFIX && c == ops[i].op[0])
-            return ops[i].kind;
+    skip_whitespace(input);
 
-    UNREACHABLE();
+    size_t best_len = 0;
+    for (size_t i = 0; i < ARR_SIZE(ops); ++i)
+    {
+        if (ops[i].fix != OP_PREFIX) // Only look at prefix operators
+            continue;
+        if (ops[i].op_len <= best_len) // Only look at longer operators
+            continue;
+        if (strncmp(*input, ops[i].op, ops[i].op_len) == 0)
+        {
+            best_len = ops[i].op_len;
+            *op = ops[i].kind;
+        }
+    }
+
+    // Return how many characters should be skipped
+    return best_len;
 }
 
 static enum op_kind char_to_postfix(char c)
@@ -67,15 +84,6 @@ static bool is_binop(char c)
 {
     for (size_t i = 0; i < ARR_SIZE(ops); ++i)
         if (ops[i].fix == OP_INFIX && c == ops[i].op[0])
-            return true;
-
-    return false;
-}
-
-static bool is_prefix(char c)
-{
-    for (size_t i = 0; i < ARR_SIZE(ops); ++i)
-        if (ops[i].fix == OP_PREFIX && c == ops[i].op[0])
             return true;
 
     return false;
@@ -159,14 +167,14 @@ static bool update_op(enum op_kind *op, const char **input)
     skip_whitespace(input);
 
     char c = *input[0];
-    if (is_binop(c))
+    if (is_binop(c)) // FIXME: Use string
     {
-        *op = char_to_binop(c);
+        *op = char_to_binop(c); // FIXME: Use string
         return true;
     }
-    if (is_postfix(c))
+    if (is_postfix(c)) // FIXME: Use string
     {
-        *op = char_to_postfix(c);
+        *op = char_to_postfix(c); // FIXME: Use string
         return true;
     }
 
@@ -186,7 +194,7 @@ static struct ast_node *climbing_parse_internal(const char **input, int prec)
     {
         const char c = *input[0];
         eat_char(input);
-        if (is_binop(c))
+        if (is_binop(c)) // FIXME: Use string
         {
             struct ast_node *rhs =
                 climbing_parse_internal(input, right_prec(op));
@@ -232,16 +240,14 @@ static bool my_atoi(const char **input, int *val)
 
 static struct ast_node *parse_operand(const char **input)
 {
-    skip_whitespace(input); // Whitespace is not significant
     struct ast_node *ast = NULL;
 
     int val = 0;
-    if (is_prefix(*input[0]))
+    size_t skip = 0;
+    enum op_kind op;
+    if ((skip = parse_prefix(&op, input))) // Removes whitespace as side-effect
     {
-        enum op_kind op = char_to_prefix(*input[0]);
-        // Remove the operator
-        eat_char(input);
-
+        *input += skip; // Skip the parsed operator
         ast = climbing_parse_internal(input, next_prec(op));
 
         if (!ast)
