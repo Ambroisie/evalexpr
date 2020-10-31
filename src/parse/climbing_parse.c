@@ -17,8 +17,8 @@ static const struct {
     const enum { ASSOC_LEFT, ASSOC_RIGHT, ASSOC_NONE } assoc;
     const enum { OP_INFIX, OP_PREFIX, OP_POSTFIX } fix;
 } ops[] = {
-# define OP(Op, Kind, Prio, Assoc, Fix) \
-    [Kind] = { #Op, Kind, Prio, Assoc, Fix },
+# define OP(Kind, Prio, Assoc, Fix, /* Operator string */ ...) \
+    [Kind] = { (const char[]){__VA_ARGS__}, Kind, Prio, Assoc, Fix, },
 #include "operators.inc"
 };
 
