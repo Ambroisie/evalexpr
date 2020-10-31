@@ -40,13 +40,26 @@ static void skip_whitespace(const char **input)
         eat_char(input);
 }
 
-static enum op_kind char_to_binop(char c)
+static size_t parse_binop(enum op_kind *op, const char **input)
 {
-    for (size_t i = 0; i < ARR_SIZE(ops); ++i)
-        if (ops[i].fix == OP_INFIX && c == ops[i].op[0])
-            return ops[i].kind;
+    skip_whitespace(input);
 
-    UNREACHABLE();
+    size_t best_len = 0;
+    for (size_t i = 0; i < ARR_SIZE(ops); ++i)
+    {
+        if (ops[i].fix != OP_INFIX) // Only look at infix operators
+            continue;
+        if (ops[i].op_len <= best_len) // Only look at longer operators
+            continue;
+        if (strncmp(*input, ops[i].op, ops[i].op_len) == 0)
+        {
+            best_len = ops[i].op_len;
+            *op = ops[i].kind;
+        }
+    }
+
+    // Return how many characters should be skipped
+    return best_len;
 }
 
 static size_t parse_prefix(enum op_kind *op, const char **input)
@@ -71,40 +84,26 @@ static size_t parse_prefix(enum op_kind *op, const char **input)
     return best_len;
 }
 
-static enum op_kind char_to_postfix(char c)
+static size_t parse_postfix(enum op_kind *op, const char **input)
 {
+    skip_whitespace(input);
+
+    size_t best_len = 0;
     for (size_t i = 0; i < ARR_SIZE(ops); ++i)
-        if (ops[i].fix == OP_POSTFIX && c == ops[i].op[0])
-            return ops[i].kind;
+    {
+        if (ops[i].fix != OP_POSTFIX) // Only look at postfix operators
+            continue;
+        if (ops[i].op_len <= best_len) // Only look at longer operators
+            continue;
+        if (strncmp(*input, ops[i].op, ops[i].op_len) == 0)
+        {
+            best_len = ops[i].op_len;
+            *op = ops[i].kind;
+        }
+    }
 
-    UNREACHABLE();
-}
-
-static bool is_binop(char c)
-{
-    for (size_t i = 0; i < ARR_SIZE(ops); ++i)
-        if (ops[i].fix == OP_INFIX && c == ops[i].op[0])
-            return true;
-
-    return false;
-}
-
-static bool is_postfix(char c)
-{
-    for (size_t i = 0; i < ARR_SIZE(ops); ++i)
-        if (ops[i].fix == OP_POSTFIX && c == ops[i].op[0])
-            return true;
-
-    return false;
-}
-
-static bool prec_between(enum op_kind op, int min, int max)
-{
-    for (size_t i = 0; i < ARR_SIZE(ops); ++i)
-        if (op == ops[i].kind)
-            return min <= ops[i].prio && ops[i].prio <= max;
-
-    return false;
+    // Return how many characters should be skipped
+    return best_len;
 }
 
 static int right_prec(enum op_kind op)
@@ -162,21 +161,46 @@ struct ast_node *climbing_parse(const char *input)
     return ast;
 }
 
-static bool update_op(enum op_kind *op, const char **input)
+static size_t update_op(enum op_kind *op, bool *is_binop, const char **input)
 {
-    skip_whitespace(input);
+    skip_whitespace(input); // Unnecessary given that both methods skip it...
 
-    char c = *input[0];
-    if (is_binop(c)) // FIXME: Use string
+    const char *save_input = *input;
+
+    enum op_kind op_bin;
+    size_t bin_size = parse_binop(&op_bin, input);
+
+    // Reset the parsing
+    *input = save_input;
+
+    enum op_kind op_post;
+    size_t post_size = parse_postfix(&op_post, input);
+
+    // Reset the parsing
+    *input = save_input;
+
+    if (bin_size > post_size)
     {
-        *op = char_to_binop(c); // FIXME: Use string
-        return true;
+        *op = op_bin;
+        *is_binop = true;
+        return bin_size;
     }
-    if (is_postfix(c)) // FIXME: Use string
+    else if (post_size > bin_size)
     {
-        *op = char_to_postfix(c); // FIXME: Use string
-        return true;
+        *op = op_post;
+        *is_binop = false;
+        return post_size;
     }
+
+    // NOTE: assume that there were no matching operators at all, instead
+    return 0;
+}
+
+static bool prec_between(enum op_kind op, int min, int max)
+{
+    for (size_t i = 0; i < ARR_SIZE(ops); ++i)
+        if (op == ops[i].kind)
+            return min <= ops[i].prio && ops[i].prio <= max;
 
     return false;
 }
@@ -187,14 +211,15 @@ static struct ast_node *climbing_parse_internal(const char **input, int prec)
     struct ast_node *ast = parse_operand(input);
 
     int r = INT_MAX;
+    size_t len = 0;
     enum op_kind op; // Used in the next loop
-    while (update_op(&op, input) // Initialise the operator
+    bool is_binop; // Used in the next loop
+    while ((len = update_op(&op, &is_binop, input)) // Initialise the operator
             && prec_between(op, prec, r) // Use newly initialized operator
             && ast)
     {
-        const char c = *input[0];
-        eat_char(input);
-        if (is_binop(c)) // FIXME: Use string
+        *input += len; // Skip the parsed operator
+        if (is_binop) // Given to us by `update_op`
         {
             struct ast_node *rhs =
                 climbing_parse_internal(input, right_prec(op));
