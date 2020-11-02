@@ -40,7 +40,7 @@ static void skip_whitespace(const char **input)
         eat_char(input);
 }
 
-static size_t parse_binop(enum op_kind *op, const char **input)
+static size_t parse_binop(size_t *op_ind, const char **input)
 {
     skip_whitespace(input);
 
@@ -54,7 +54,7 @@ static size_t parse_binop(enum op_kind *op, const char **input)
         if (strncmp(*input, ops[i].op, ops[i].op_len) == 0)
         {
             best_len = ops[i].op_len;
-            *op = ops[i].kind;
+            *op_ind = i;
         }
     }
 
@@ -62,7 +62,7 @@ static size_t parse_binop(enum op_kind *op, const char **input)
     return best_len;
 }
 
-static size_t parse_prefix(enum op_kind *op, const char **input)
+static size_t parse_prefix(size_t *op_ind, const char **input)
 {
     skip_whitespace(input);
 
@@ -76,7 +76,7 @@ static size_t parse_prefix(enum op_kind *op, const char **input)
         if (strncmp(*input, ops[i].op, ops[i].op_len) == 0)
         {
             best_len = ops[i].op_len;
-            *op = ops[i].kind;
+            *op_ind = i;
         }
     }
 
@@ -84,7 +84,7 @@ static size_t parse_prefix(enum op_kind *op, const char **input)
     return best_len;
 }
 
-static size_t parse_postfix(enum op_kind *op, const char **input)
+static size_t parse_postfix(size_t *op_ind, const char **input)
 {
     skip_whitespace(input);
 
@@ -98,7 +98,7 @@ static size_t parse_postfix(enum op_kind *op, const char **input)
         if (strncmp(*input, ops[i].op, ops[i].op_len) == 0)
         {
             best_len = ops[i].op_len;
-            *op = ops[i].kind;
+            *op_ind = i;
         }
     }
 
@@ -106,30 +106,24 @@ static size_t parse_postfix(enum op_kind *op, const char **input)
     return best_len;
 }
 
-static int right_prec(enum op_kind op)
+static int right_prec(size_t op_ind)
 {
-    for (size_t i = 0; i < ARR_SIZE(ops); ++i)
-        if (op == ops[i].kind)
-        {
-            if (ops[i].assoc == ASSOC_RIGHT)
-                return ops[i].prio;
-            return ops[i].prio + 1;
-        }
+    if (op_ind >= ARR_SIZE(ops))
+        return INT_MIN; // Defensive programming
 
-    return INT_MIN;
+    if (ops[op_ind].assoc == ASSOC_RIGHT)
+        return ops[op_ind].prio;
+    return ops[op_ind].prio + 1;
 }
 
-static int next_prec(enum op_kind op)
+static int next_prec(size_t op_ind)
 {
-    for (size_t i = 0; i < ARR_SIZE(ops); ++i)
-        if (op == ops[i].kind)
-        {
-            if (ops[i].assoc != ASSOC_LEFT)
-                return ops[i].prio - 1;
-            return ops[i].prio;
-        }
+    if (op_ind >= ARR_SIZE(ops))
+        return INT_MIN; // Defensive programming
 
-    return INT_MIN;
+    if (ops[op_ind].assoc != ASSOC_LEFT)
+        return ops[op_ind].prio - 1;
+    return ops[op_ind].prio;
 }
 
 /*
@@ -161,19 +155,19 @@ struct ast_node *climbing_parse(const char *input)
     return ast;
 }
 
-static size_t update_op(enum op_kind *op, bool *is_binop, const char **input)
+static size_t update_op(size_t *op_ind, bool *is_binop, const char **input)
 {
     skip_whitespace(input); // Unnecessary given that both methods skip it...
 
     const char *save_input = *input;
 
-    enum op_kind op_bin;
+    size_t op_bin;
     size_t bin_size = parse_binop(&op_bin, input);
 
     // Reset the parsing
     *input = save_input;
 
-    enum op_kind op_post;
+    size_t op_post;
     size_t post_size = parse_postfix(&op_post, input);
 
     // Reset the parsing
@@ -181,13 +175,13 @@ static size_t update_op(enum op_kind *op, bool *is_binop, const char **input)
 
     if (bin_size > post_size)
     {
-        *op = op_bin;
+        *op_ind = op_bin;
         *is_binop = true;
         return bin_size;
     }
     else if (post_size > bin_size)
     {
-        *op = op_post;
+        *op_ind = op_post;
         *is_binop = false;
         return post_size;
     }
@@ -196,13 +190,12 @@ static size_t update_op(enum op_kind *op, bool *is_binop, const char **input)
     return 0;
 }
 
-static bool prec_between(enum op_kind op, int min, int max)
+static bool prec_between(size_t op_ind, int min, int max)
 {
-    for (size_t i = 0; i < ARR_SIZE(ops); ++i)
-        if (op == ops[i].kind)
-            return min <= ops[i].prio && ops[i].prio <= max;
+    if (op_ind >= ARR_SIZE(ops))
+        return false; // Defensive programming
 
-    return false;
+    return min <= ops[op_ind].prio && ops[op_ind].prio <= max;
 }
 
 static struct ast_node *climbing_parse_internal(const char **input, int prec)
@@ -212,23 +205,23 @@ static struct ast_node *climbing_parse_internal(const char **input, int prec)
 
     int r = INT_MAX;
     size_t len = 0;
-    enum op_kind op; // Used in the next loop
+    size_t op_ind; // Used in the next loop
     bool is_binop; // Used in the next loop
-    while ((len = update_op(&op, &is_binop, input)) // Initialise the operator
-            && prec_between(op, prec, r) // Use newly initialized operator
+    while ((len = update_op(&op_ind, &is_binop, input)) // Initialise the operator
+            && prec_between(op_ind, prec, r) // Use newly initialized operator
             && ast)
     {
         *input += len; // Skip the parsed operator
         if (is_binop) // Given to us by `update_op`
         {
             struct ast_node *rhs =
-                climbing_parse_internal(input, right_prec(op));
+                climbing_parse_internal(input, right_prec(op_ind));
             if (!rhs)
             {
                 destroy_ast(ast);
                 return NULL;
             }
-            struct ast_node *tree = make_binop(op, ast, rhs);
+            struct ast_node *tree = make_binop(ops[op_ind].kind, ast, rhs);
 
             if (!tree)
                 destroy_ast(ast); // Error case
@@ -236,12 +229,12 @@ static struct ast_node *climbing_parse_internal(const char **input, int prec)
         }
         else
         {
-            struct ast_node *tree = make_unop(op, ast);
+            struct ast_node *tree = make_unop(ops[op_ind].kind, ast);
             if (!tree)
                 destroy_ast(ast); // Error case
             ast = tree;
         }
-        r = next_prec(op);
+        r = next_prec(op_ind);
     }
 
     return ast;
@@ -269,15 +262,15 @@ static struct ast_node *parse_operand(const char **input)
 
     int val = 0;
     size_t skip = 0;
-    enum op_kind op;
-    if ((skip = parse_prefix(&op, input))) // Removes whitespace as side-effect
+    size_t op_ind;
+    if ((skip = parse_prefix(&op_ind, input))) // Removes whitespace as side-effect
     {
         *input += skip; // Skip the parsed operator
-        ast = climbing_parse_internal(input, next_prec(op));
+        ast = climbing_parse_internal(input, next_prec(op_ind));
 
         if (!ast)
             return NULL;
-        struct ast_node *tree = make_unop(op, ast);
+        struct ast_node *tree = make_unop(ops[op_ind].kind, ast);
         if (!tree)
             destroy_ast(ast);
         ast = tree;
